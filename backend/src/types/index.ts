@@ -25,12 +25,13 @@ export interface OHLCVBar {
 }
 
 export interface WsIncomingMessage {
-    type: "SUBSCRIBE" | "UNSUBSCRIBE" | "SET_ALERT" | "REMOVE_ALERT";
+    type: "SUBSCRIBE" | "UNSUBSCRIBE" | "SET_ALERT" | "REMOVE_ALERT" | "AUTH";
     symbols?: string[];
     symbol?: string;
     alertId?: string;
     above?: number;
     below?: number;
+    token?: string;
 }
 
 export interface WsOutgoingMessage {

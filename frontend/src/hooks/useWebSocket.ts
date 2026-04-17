@@ -19,25 +19,17 @@ export function useWebSocket(symbols: string[]) {
 
     symbolsRef.current = symbols;
 
-    // Fetch and cache the session token so it can be passed to the WS URL
-    // (the WS connects cross-origin to Railway; cookies aren't sent there).
-    useEffect(() => {
-        authClient.getSession()
-            .then((res) => {
-                sessionTokenRef.current = (res as { data?: { session?: { token?: string } } })?.data?.session?.token ?? null;
-            })
-            .catch(() => { /* unauthenticated */ });
-    }, []);
-
     const getWsUrl = useCallback(() => {
         const loc = window.location;
         const protocol = loc.protocol === "https:" ? "wss:" : "ws:";
         const wsBase = import.meta.env.VITE_WS_URL;
-        let base = wsBase ? `${wsBase}/ws` : `${protocol}//${loc.host}/ws`;
-        if (sessionTokenRef.current) {
-            base += `?token=${encodeURIComponent(sessionTokenRef.current)}`;
+        return wsBase ? `${wsBase}/ws` : `${protocol}//${loc.host}/ws`;
+    }, []);
+
+    const sendAuth = useCallback((ws: WebSocket, token: string) => {
+        if (ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({ type: "AUTH", token }));
         }
-        return base;
     }, []);
 
     const subscribe = useCallback((ws: WebSocket) => {
@@ -50,7 +42,14 @@ export function useWebSocket(symbols: string[]) {
         const ws = new WebSocket(getWsUrl());
         wsRef.current = ws;
 
-        ws.onopen = () => subscribe(ws);
+        ws.onopen = () => {
+            // If we already have the session token cached (from a previous
+            // connect or a resolved fetch), send AUTH immediately.
+            if (sessionTokenRef.current) {
+                sendAuth(ws, sessionTokenRef.current);
+            }
+            subscribe(ws);
+        };
 
         ws.onmessage = (event) => {
             try {
@@ -102,7 +101,23 @@ export function useWebSocket(symbols: string[]) {
         };
 
         ws.onerror = () => ws.close();
-    }, [getWsUrl, subscribe, applyTick, applySnapshot, addAlert, addNotification, markAlertTriggered]);
+    }, [getWsUrl, sendAuth, subscribe, applyTick, applySnapshot, addAlert, addNotification, markAlertTriggered]);
+
+    // Fetch the session token via the API (works even with httpOnly cookies since
+    // the request goes through the Vercel proxy where cookies are first-party).
+    // On first connect the token may not be ready yet — when it arrives, AUTH is
+    // sent over the already-open WS. On reconnects the cached token is used.
+    useEffect(() => {
+        authClient.getSession().then((res) => {
+            const token = (res.data as { session?: { token?: string } } | null)?.session?.token;
+            if (!token) return;
+            sessionTokenRef.current = token;
+            const ws = wsRef.current;
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                sendAuth(ws, token);
+            }
+        }).catch(() => { /* unauthenticated */ });
+    }, [sendAuth]);
 
     useEffect(() => {
         connect();

@@ -1,5 +1,5 @@
 import { WebSocketServer, WebSocket } from "ws";
-import type { Server, IncomingMessage } from "http";
+import type { Server } from "http";
 import { randomUUID } from "crypto";
 import { fromNodeHeaders } from "better-auth/node";
 import { simulator } from "../services/marketSimulator.js";
@@ -42,7 +42,7 @@ export function createWsServer(server: Server): WebSocketServer {
             removeConnectionAlerts(id);
         });
 
-        void hydrateClientAlerts(client, req);
+        void hydrateClientAlerts(client, req.headers);
     });
 
     // Broadcast ticks to subscribed clients
@@ -98,36 +98,43 @@ export function createWsServer(server: Server): WebSocketServer {
     return wss;
 }
 
-async function hydrateClientAlerts(client: TrackedClient, req: IncomingMessage): Promise<void> {
+async function hydrateClientAlerts(client: TrackedClient, headers: Record<string, string | string[] | undefined>): Promise<void> {
     try {
-        // In cross-origin deployments (e.g. Vercel + Railway) the session cookie
-        // is scoped to the frontend domain and is not sent with the WS handshake.
-        // The client passes the Better Auth session token as ?token= instead.
-        const urlToken = req.url
-            ? new URL(req.url, "http://localhost").searchParams.get("token")
-            : null;
-
-        const sessionHeaders = urlToken
-            ? new Headers({ authorization: `Bearer ${urlToken}` })
-            : fromNodeHeaders(req.headers);
-
-        const session = await auth.api.getSession({ headers: sessionHeaders });
+        const session = await auth.api.getSession({ headers: fromNodeHeaders(headers) });
         if (!session?.user.id) return;
 
-        client.userId = session.user.id;
-        const alerts = await listActiveAlertsByUser(session.user.id);
-        setConnectionAlerts(
-            client.id,
-            alerts.map((alert) => ({
-                id: alert.id,
-                symbol: alert.symbol,
-                above: alert.above ?? undefined,
-                below: alert.below ?? undefined,
-            })),
-        );
+        await armClientAlerts(client, session.user.id);
     } catch {
-        // Alerts remain unavailable for unauthenticated or not-yet-migrated connections.
+        // Alerts remain unavailable for unauthenticated connections.
+        // Cross-origin clients will authenticate via the AUTH message instead.
     }
+}
+
+async function authenticateWithToken(client: TrackedClient, token: string): Promise<void> {
+    try {
+        const session = await auth.api.getSession({
+            headers: new Headers({ authorization: `Bearer ${token}` }),
+        });
+        if (!session?.user.id) return;
+
+        await armClientAlerts(client, session.user.id);
+    } catch {
+        // Invalid token — ignore
+    }
+}
+
+async function armClientAlerts(client: TrackedClient, userId: string): Promise<void> {
+    client.userId = userId;
+    const alerts = await listActiveAlertsByUser(userId);
+    setConnectionAlerts(
+        client.id,
+        alerts.map((alert) => ({
+            id: alert.id,
+            symbol: alert.symbol,
+            above: alert.above ?? undefined,
+            below: alert.below ?? undefined,
+        })),
+    );
 }
 
 async function handleMessage(client: TrackedClient, raw: string): Promise<void> {
@@ -153,6 +160,15 @@ async function handleMessage(client: TrackedClient, raw: string): Promise<void> 
     }
 
     switch (msg.type) {
+        case "AUTH": {
+            if (!msg.token || typeof msg.token !== "string") {
+                send(client.ws, { type: "ERROR", code: "MISSING_TOKEN", message: "AUTH requires a token" });
+                return;
+            }
+            await authenticateWithToken(client, msg.token);
+            break;
+        }
+
         case "SUBSCRIBE": {
             const symbols = msg.symbols ?? [];
             for (const sym of symbols) {
