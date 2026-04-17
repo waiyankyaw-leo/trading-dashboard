@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: tradedash-backend
+    runtime: node
+    rootDir: .
+    buildCommand: npm ci && npm run build --workspace backend
+    startCommand: node backend/dist/migrate.js && node backend/dist/server.js
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 4000
+      - key: DATABASE_URL
+        sync: false          # set manually in Render dashboard
+      - key: BETTER_AUTH_SECRET
+        generateValue: true  # Render auto-generates a secure random value
+      - key: BETTER_AUTH_URL
+        sync: false          # set to https://<your-render-domain> after deploy
+      - key: FRONTEND_URL
+        sync: false          # set to https://<your-vercel-domain> after deploy
