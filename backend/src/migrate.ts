@@ -24,13 +24,13 @@ async function run() {
     const client = await pool.connect();
     try {
         // 1. Better Auth core tables
-        const authSchema = readFileSync(join(__dirname, "../../auth-schema.sql"), "utf8");
+        const authSchema = readFileSync(join(__dirname, "../auth-schema.sql"), "utf8");
         console.log("→ Running auth-schema.sql …");
         await client.query(authSchema);
         console.log("  ✓ auth-schema.sql applied");
 
         // 2. App migrations — run in filename order (001_, 002_, …)
-        const migrationsDir = join(__dirname, "../../migrations");
+        const migrationsDir = join(__dirname, "../migrations");
         const files = readdirSync(migrationsDir)
             .filter((f) => f.endsWith(".sql"))
             .sort();
