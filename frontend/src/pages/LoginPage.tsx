@@ -5,8 +5,8 @@ import { useNavigate } from "react-router-dom";
 export function LoginPage() {
     const navigate = useNavigate();
     const [mode, setMode] = useState<"signin" | "signup">("signin");
-    const [email, setEmail] = useState("");
-    const [password, setPassword] = useState("");
+    const [email, setEmail] = useState("demo@gmail.com");
+    const [password, setPassword] = useState("Demo123!");
     const [name, setName] = useState("");
     const [error, setError] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
