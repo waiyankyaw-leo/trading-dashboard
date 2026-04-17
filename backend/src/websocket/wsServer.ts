@@ -113,9 +113,6 @@ async function hydrateClientAlerts(client: TrackedClient, headers: Record<string
 
 async function authenticateWithToken(client: TrackedClient, token: string): Promise<void> {
     try {
-        // Look up the session directly in the DB by its token.
-        // Better Auth's getSession only reads from cookies / signed cookie headers,
-        // which are unavailable in cross-origin WS connections.
         const result = await dbPool.query<{ userId: string; expiresAt: Date }>(
             `SELECT "userId", "expiresAt" FROM "session" WHERE "token" = $1 LIMIT 1`,
             [token],
