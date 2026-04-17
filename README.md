@@ -267,7 +267,7 @@ Complete `k8s/` directory:
 | **Geometric Brownian Motion** | GBM with per-ticker volatility produces realistic random walks instead of flat noise. Crypto volatility is slightly damped for demo readability. |
 | **Seeded historical bars** | Deterministic hash-based generation ensures chart history is stable across refreshes, with regime bias, body/wick ratios, and mean reversion. |
 | **No ORM** | Better Auth manages its own Postgres schema. Alert queries use raw `pg` with parameterized statements (SQL injection safe). |
-| **HTTP-only session cookies** | More secure than JWT-in-localStorage. For cross-origin deployment (Vercel ↔ Render), cookies use `SameSite=None; Secure`. |
+| **HTTP-only session cookies** | More secure than JWT-in-localStorage. For cross-origin deployment (Vercel ↔ Railway), cookies use `SameSite=None; Secure`. |
 | **Alerts fire once** | An alert triggers once and is marked `triggered_at` in the DB. Deduplicated across tabs on both server and client. |
 | **No rate-limiting** | Acceptable for a demo; production would add `@fastify/rate-limit`. |
 
@@ -281,46 +281,41 @@ Complete `k8s/` directory:
 docker compose up --build
 ```
 
-### Option B: Vercel (Frontend) + Render (Backend, free) + Supabase (Database)
+### Option B: Vercel (Frontend) + Railway (Backend) + Supabase (Database)
 
-> This is a **monorepo** — push a single repo to GitHub; Render and Vercel each consume their own slice.
->
-> **Why not Railway?** Railway's free tier was removed. Render has a free tier (750 hrs/month). Note: free Render web services **sleep after 15 minutes of inactivity** — the first WebSocket connection after a sleep period will take ~30 s to warm up. Upgrade to a paid instance ($7/mo) or use Fly.io/Koyeb for always-on deployments.
+> This is a **monorepo** — push one repo to GitHub; Railway and Vercel each consume their own slice using the settings below.
 
 #### Step 0 — Push to GitHub
 
 ```bash
-# Create a new empty repo on github.com, then:
 git remote add origin https://github.com/<your-user>/tradedash.git
 git push -u origin master
 ```
 
 #### Step 1 — Supabase (database)
 1. Create a Supabase project → copy the direct connection string (port 5432).
-2. Run both SQL files (`auth-schema.sql`, `001_create_price_alerts.sql`) in Supabase SQL Editor.
+2. Run both SQL files in the Supabase SQL Editor (in order):
+   - `backend/auth-schema.sql`
+   - `backend/migrations/001_create_price_alerts.sql`
 
-#### Step 2 — Render (backend)
-1. Go to [render.com](https://render.com) → **New → Web Service** → connect the GitHub repo.
-2. Render auto-detects `render.yaml` — no manual config needed. Just set the secret env vars in the dashboard:
-   - `DATABASE_URL` — Supabase direct connection string
-   - `BETTER_AUTH_URL` — `https://<your-render-service>.onrender.com`
+#### Step 2 — Railway (backend)
+1. Go to [railway.app](https://railway.app) → **New Project → Deploy from GitHub repo**.
+2. Select the repo. Railway auto-detects `railway.json` — no manual build/start config needed.
+3. Add environment variables (**Variables** tab):
+   - `DATABASE_URL` — Supabase direct connection string (port 5432)
+   - `BETTER_AUTH_SECRET` — `openssl rand -hex 32`
+   - `BETTER_AUTH_URL` — `https://<your-railway-domain>` (shown after first deploy)
    - `FRONTEND_URL` — `https://<your-vercel-domain>` (update after Step 3)
-3. Deploy. Render runs `migrate.js` then `server.js` automatically.
+   - `NODE_ENV` — `production`
+4. Deploy. Railway runs `migrate.js` then `server.js` automatically and handles TLS + WebSocket upgrade.
 
 #### Step 3 — Vercel (frontend)
 1. Import the repo at [vercel.com](https://vercel.com). Set **Root Directory = `frontend`**.
 2. Add environment variables:
-   - `VITE_API_URL` — `https://<your-render-service>.onrender.com`
-   - `VITE_WS_URL` — `wss://<your-render-service>.onrender.com`
-3. Deploy, then go back to Render and update `FRONTEND_URL` with the Vercel URL.
+   - `VITE_API_URL` — `https://<your-railway-domain>`
+   - `VITE_WS_URL` — `wss://<your-railway-domain>`
+3. Deploy, then go back to Railway and update `FRONTEND_URL` with the Vercel production URL.
    > `frontend/vercel.json` is already configured with SPA rewrites and security headers.
-
-#### Alternative free backends (no sleep)
-
-| Platform | Setup |
-|---|---|
-| **Fly.io** | `fly launch` from repo root — never sleeps, best for WebSocket |
-| **Koyeb** | Connect GitHub repo, set build/start commands same as Render, free nano instance never sleeps |
 
 ### Option C: Kubernetes
 

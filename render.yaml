@@ -12,10 +12,10 @@ services:
       - key: PORT
         value: 4000
       - key: DATABASE_URL
-        sync: false          # set manually in Render dashboard
+        sync: false # set manually in Render dashboard
       - key: BETTER_AUTH_SECRET
-        generateValue: true  # Render auto-generates a secure random value
+        generateValue: true # Render auto-generates a secure random value
       - key: BETTER_AUTH_URL
-        sync: false          # set to https://<your-render-domain> after deploy
+        sync: false # set to https://<your-render-domain> after deploy
       - key: FRONTEND_URL
-        sync: false          # set to https://<your-vercel-domain> after deploy
+        sync: false # set to https://<your-vercel-domain> after deploy
