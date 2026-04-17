@@ -1,6 +1,8 @@
 # TradeDash — Real-Time Trading Dashboard
 
-A full-stack, real-time trading dashboard that simulates live market data and displays interactive candlestick charts for multiple financial instruments — built as a Frontend/Fullstack Coding Challenge submission.
+A full-stack trading dashboard that streams live simulated market data, renders interactive candlestick charts, and lets users set persistent price alerts — built as a submission for the Frontend/Fullstack Coding Challenge.
+
+**Live demo:** [https://trading-dashboard-xi-two.vercel.app](https://trading-dashboard-xi-two.vercel.app)
 
 ---
 
@@ -22,9 +24,9 @@ A full-stack, real-time trading dashboard that simulates live market data and di
 
 ## Project Overview
 
-TradeDash fulfils every scope requirement and all optional bonus features outlined in the challenge brief:
+Everything in the challenge scope is covered, including all four bonus features:
 
-| Requirement | Status | Implementation |
+| Requirement | Status | How it's done |
 |---|:---:|---|
 | **Backend Service (Node.js)** | ✅ | Fastify 5 microservice with TypeScript |
 | Simulates mock market data feed | ✅ | Geometric Brownian Motion with per-ticker volatility |
@@ -81,14 +83,14 @@ Browser (Port 3000)                          Backend (Port 4000)
 └──────────────────────────┘                └──────────────────────────┘
 ```
 
-**Data flow:**
+**How data flows:**
 
-1. Backend's `MarketSimulator` uses Geometric Brownian Motion to generate realistic price ticks every 1 s.
-2. Ticks are emitted via EventEmitter → WebSocket server broadcasts to subscribed clients.
-3. Each tick updates rolling OHLCV bars (1m through 1d) in memory; these serve the history API.
-4. Frontend subscribes on connect; ticks flow into Zustand store → chart updates via `series.update()`.
-5. History endpoint seeds the chart with up to 500 candles; the live bar is seamlessly continued by WS ticks.
-6. Alerts are persisted in PostgreSQL, loaded into the WS alert engine on connect, and fired as `ALERT` frames.
+1. The `MarketSimulator` generates price ticks every second using Geometric Brownian Motion.
+2. Ticks are emitted via EventEmitter → the WebSocket server broadcasts them to subscribed clients.
+3. Each tick updates rolling OHLCV bars (1m through 1d) in memory, which power the history API.
+4. The frontend receives ticks and pushes them into a Zustand store → the chart updates via `series.update()`.
+5. On load, the history endpoint seeds the chart with up to 500 candles; live ticks continue seamlessly from there.
+6. Price alerts are persisted in PostgreSQL, armed in the WS engine on connect, and fired as `ALERT` frames when crossed.
 
 ---
 
@@ -97,15 +99,15 @@ Browser (Port 3000)                          Backend (Port 4000)
 ### Prerequisites
 
 - **Node.js 20+** and **npm 9+**
-- A **PostgreSQL 14+** instance (Railway Postgres recommended, or any local Postgres)
-- Docker & Docker Compose v2 (optional, for containerized run)
+- A **PostgreSQL 14+** instance (Railway Postgres, or any local Postgres)
+- Docker & Docker Compose v2 *(optional — for containerised run)*
 
 ### 1. Clone & install
 
 ```bash
 git clone https://github.com/waiyankyaw-leo/trading-dashboard.git
 cd trading-dashboard
-npm install          # installs all workspaces from root lockfile
+npm install   # installs all workspaces from the root lockfile
 ```
 
 ### 2. Configure the backend
@@ -144,7 +146,7 @@ VITE_WS_URL=ws://localhost:4000
 
 ### 4. Run database migrations
 
-Migrations run automatically on startup via `migrate.js`. To run manually:
+Migrations run automatically on server startup. To trigger them manually:
 
 ```bash
 cd backend
@@ -155,14 +157,14 @@ npm run db:migrate
 
 ```bash
 cd backend
-npm run dev          # http://localhost:4000
+npm run dev   # http://localhost:4000
 ```
 
 ### 6. Start the frontend
 
 ```bash
 cd frontend
-npm run dev          # http://localhost:3000 (proxies to :4000)
+npm run dev   # http://localhost:3000 (proxies /api and /ws to :4000)
 ```
 
 ### 7. Docker (both services)
@@ -181,26 +183,24 @@ docker compose up --build
 ## Running Tests
 
 ```bash
-# Backend (49 tests — services, routes, WebSocket integration)
-cd backend
-npm test
+# Backend — 49 tests covering services, routes, and WebSocket
+cd backend && npm test
 
-# Frontend (12 tests — store, components)
-cd frontend
-npm test
+# Frontend — 12 tests covering store logic and components
+cd frontend && npm test
 ```
 
-### Test coverage breakdown
+### What's tested
 
 | Area | Test file | Tests | What's covered |
 |---|---|:---:|---|
-| Market Simulator | `marketSimulator.test.ts` | 12 | GBM bounds, tick shape, event emission, Gaussian distribution |
-| Ticker Service | `tickerService.test.ts` | 8 | List all, get single, case-insensitive, invalid symbols |
-| History Service | `historyService.test.ts` | 12 | OHLCV generation, interval validation, cache hits, chronological order |
-| REST Routes | `integration/routes.test.ts` | 15 | Health, tickers, history params, auth-guarded alert endpoints |
-| WebSocket | `integration/websocket.test.ts` | 2 | SUBSCRIBE → TICK streaming, invalid JSON → ERROR frame |
+| Market Simulator | `marketSimulator.test.ts` | 12 | GBM bounds, tick shape, event emission |
+| Ticker Service | `tickerService.test.ts` | 8 | List all, single lookup, invalid symbols |
+| History Service | `historyService.test.ts` | 12 | OHLCV generation, cache hits, chronological order |
+| REST Routes | `integration/routes.test.ts` | 15 | Health, tickers, history, auth-guarded alerts |
+| WebSocket | `integration/websocket.test.ts` | 2 | SUBSCRIBE → TICK streaming, invalid JSON handling |
 | FE Store | `tickerStore.test.ts` | 7 | Tick application, buffer limits, alerts, snapshots |
-| FE Components | `PriceChange.test.tsx`, `Spinner.test.tsx` | 5 | Color coding, rendering |
+| FE Components | `PriceChange.test.tsx`, `Spinner.test.tsx` | 5 | Rendering, colour coding |
 
 ---
 
@@ -254,19 +254,19 @@ Connect to `ws://localhost:4000/ws`
 
 ### 1. User Authentication
 
-Better Auth with PostgreSQL (Railway Postgres). Sessions stored server-side with HTTP-only cookies — **no tokens in `localStorage`**, eliminating XSS attack vectors. CSRF protection via trusted origins. Supports login, registration, and session-based route protection.
+Auth is handled by Better Auth backed by PostgreSQL. Sessions are stored server-side and delivered as HTTP-only cookies — no tokens ever touch `localStorage`, which removes the XSS attack surface entirely. CORS and CSRF are locked down via trusted origins. Users can register, log in, and access protected routes.
 
 ### 2. History Caching
 
-`node-cache` with a 60-second TTL. Cache keys are composites of symbol, interval, limit, and a live-bar fingerprint — so identical requests hit the cache while still refreshing when the active candle changes.
+Historical OHLCV data is cached with `node-cache` at a 60-second TTL. Cache keys include the symbol, interval, limit, and a live-bar fingerprint, so repeated requests are fast while the active candle still refreshes in real time.
 
 ### 3. Price Threshold Alerts
 
-Full lifecycle: create via REST or chart right-click → persist in PostgreSQL → arm in the WebSocket alert engine → render as **draggable chart lines** with labels → fire once when the price crosses → toast notification with auto-dismiss countdown. Alerts deduplicate across multiple tabs on both server and client.
+The full alert lifecycle works end-to-end: create an alert via the REST API or by right-clicking the chart → it's saved to PostgreSQL → armed in the WebSocket alert engine when a client connects → rendered as a draggable line on the chart → fires once when the price crosses the threshold → triggers a toast notification with an auto-dismiss countdown. Alerts deduplicate across multiple tabs on both server and client.
 
 ### 4. Kubernetes Manifests
 
-Complete `k8s/` directory:
+The `k8s/` folder has everything needed to run this on a cluster:
 - `namespace.yaml` — `tradedash` namespace
 - `backend-deployment.yaml` — Deployment (2 replicas), Service (ClusterIP), HPA (CPU 70%, max 5)
 - `frontend-deployment.yaml` — Deployment + Service
@@ -277,15 +277,15 @@ Complete `k8s/` directory:
 
 ## Assumptions & Trade-offs
 
-| Decision | Rationale |
+| Decision | Reasoning |
 |---|---|
-| **In-memory market data** | Price ticks and OHLCV bars live in memory. Production would use TimescaleDB/InfluxDB — out of scope for this challenge. |
-| **Geometric Brownian Motion** | GBM with per-ticker volatility produces realistic random walks instead of flat noise. Crypto volatility is slightly damped for demo readability. |
-| **Seeded historical bars** | Deterministic hash-based generation ensures chart history is stable across refreshes, with regime bias, body/wick ratios, and mean reversion. |
-| **No ORM** | Better Auth manages its own Postgres schema. Alert queries use raw `pg` with parameterized statements (SQL injection safe). |
-| **HTTP-only session cookies** | More secure than JWT-in-localStorage. For cross-origin deployment (Vercel ↔ Railway), cookies use `SameSite=None; Secure`. |
-| **Alerts fire once** | An alert triggers once and is marked `triggered_at` in the DB. Deduplicated across tabs on both server and client. |
-| **No rate-limiting** | Acceptable for a demo; production would add `@fastify/rate-limit`. |
+| **In-memory market data** | Price ticks and OHLCV bars live in memory. A production system would use TimescaleDB or InfluxDB, but that's out of scope here. |
+| **Geometric Brownian Motion** | GBM with per-ticker volatility gives realistic random walks rather than flat noise. Crypto volatility is slightly damped for readability. |
+| **Seeded historical bars** | Deterministic hash-based generation keeps chart history stable across page refreshes, with regime bias, realistic body/wick ratios, and mean reversion baked in. |
+| **No ORM** | Better Auth manages its own schema. Alert queries use raw `pg` with parameterised statements — no SQL injection risk. |
+| **HTTP-only session cookies** | Safer than JWT in localStorage. For the cross-origin Vercel ↔ Railway deployment, cookies use `SameSite=None; Secure`. |
+| **Alerts fire once** | An alert triggers once and is marked `triggered_at` in the DB. It won't re-fire and is deduplicated across browser tabs. |
+| **No rate-limiting** | Fine for a demo. Production would add `@fastify/rate-limit`. |
 
 ---
 
@@ -297,41 +297,32 @@ Complete `k8s/` directory:
 docker compose up --build
 ```
 
-### Option B: Vercel (Frontend) + Railway (Backend) + Railway Postgres (Database)
+### Option B: Vercel + Railway (recommended)
 
-> This is a **monorepo** — push one repo to GitHub; Railway and Vercel each consume their own slice using the settings below.
+> This is a monorepo — one GitHub repo, with Railway and Vercel each targeting their own subfolder.
 
-**Live demo:** [https://trading-dashboard-xi-two.vercel.app](https://trading-dashboard-xi-two.vercel.app)
+#### Step 1 — Database
+Add a **Railway Postgres** service to your project. Railway automatically exposes `${{Postgres.DATABASE_URL}}` as a reference variable. Migrations run on first deploy — no manual SQL needed.
 
-#### Step 0 — Push to GitHub
-
-```bash
-git remote add origin https://github.com/<your-user>/tradedash.git
-git push -u origin master
-```
-
-#### Step 1 — Database (Railway Postgres recommended)
-1. Add a Railway Postgres service to your project → Railway auto-sets `${{Postgres.DATABASE_URL}}`.
-2. Migrations run automatically on deploy via `migrate.js` — no manual SQL needed.
-
-#### Step 2 — Railway (backend)
-1. Go to [railway.app](https://railway.app) → **New Project → Deploy from GitHub repo**.
-2. Select the repo. Railway auto-detects `railway.json` — no manual build/start config needed.
-3. Add environment variables (**Variables** tab):
+#### Step 2 — Backend (Railway)
+1. New Project → **Deploy from GitHub repo** → select this repo.
+2. Railway picks up `railway.json` automatically (build + start commands are pre-configured).
+3. Set these environment variables **(no quotes)**:
    - `DATABASE_URL` — `${{Postgres.DATABASE_URL}}` (Railway Postgres reference)
    - `BETTER_AUTH_SECRET` — `openssl rand -hex 32`
    - `BETTER_AUTH_URL` — `https://<your-railway-domain>` (shown after first deploy)
    - `FRONTEND_URL` — `https://<your-vercel-domain>` (update after Step 3)
    - `NODE_ENV` — `production`
-4. Deploy. Railway runs `migrate.js` then `server.js` automatically and handles TLS + WebSocket upgrade.
+4. Deploy — Railway runs `migrate.js` then `server.js`, and handles TLS + WebSocket upgrades automatically.
 
-#### Step 3 — Vercel (frontend)
-1. Import the repo at [vercel.com](https://vercel.com). Set **Root Directory = `frontend`**.
-2. Add environment variable:
-   - `VITE_WS_URL` — `wss://<your-railway-domain>`
-   > `VITE_API_URL` is **not needed** — `vercel.json` proxies `/api/*` to Railway so cookies are always first-party.
-3. Deploy, then go back to Railway and update `FRONTEND_URL` with the Vercel production URL.
-   > `frontend/vercel.json` is already configured with SPA rewrites, `/api` proxy, and security headers.
+#### Step 3 — Frontend (Vercel)
+1. Import the repo → set **Root Directory = `frontend`**.
+2. Add one environment variable:
+   ```
+   VITE_WS_URL=wss://<your-railway-domain>
+   ```
+   > `VITE_API_URL` is not needed — `vercel.json` already proxies `/api/*` to Railway, keeping cookies first-party.
+3. Deploy → copy the Vercel URL → go back to Railway and update `FRONTEND_URL`.
 
 ### Option C: Kubernetes
 
