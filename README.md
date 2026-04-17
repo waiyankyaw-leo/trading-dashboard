@@ -283,13 +283,23 @@ docker compose up --build
 
 ### Option B: Vercel (Frontend) + Railway (Backend) + Supabase (Database)
 
+> This is a **monorepo** — push a single repo to GitHub; Railway and Vercel each consume their own slice using the settings below.
+
+#### Step 0 — Push to GitHub
+
+```bash
+# Create a new empty repo on github.com, then:
+git remote add origin https://github.com/<your-user>/tradedash.git
+git push -u origin master
+```
+
 > **Important:** The backend requires a **long-running process** (WebSocket server + tick simulator), so it cannot run on Vercel Functions. Use Railway, Fly.io, or Render for the backend.
 
-**Supabase (database)**
+#### Step 1 — Supabase (database)
 1. Create a Supabase project → copy the direct connection string (port 5432).
 2. Run both SQL files (`auth-schema.sql`, `001_create_price_alerts.sql`) in Supabase SQL Editor.
 
-**Railway (backend)**
+#### Step 2 — Railway (backend)
 1. Connect the GitHub repo.
 2. Set root directory: `/`, build command: `npm ci && npm run build --workspace backend`, start command: `node backend/dist/server.js`.
 3. Add environment variables:
@@ -299,14 +309,16 @@ docker compose up --build
    - `FRONTEND_URL` — `https://<vercel-domain>`
    - `NODE_ENV` — `production`
 4. Railway handles TLS and WebSocket upgrade automatically.
+   > `railway.json` at the repo root is already configured with the correct build and start commands.
 
-**Vercel (frontend)**
+#### Step 3 — Vercel (frontend)
 1. Import the repo. Set root directory: `frontend`.
 2. Build command: `cd .. && npm ci && npm run build --workspace frontend`, output directory: `dist`.
 3. Add environment variables:
    - `VITE_API_URL` — `https://<railway-domain>`
    - `VITE_WS_URL` — `wss://<railway-domain>`
 4. Deploy, then update Railway's `FRONTEND_URL` with the Vercel production URL.
+   > `frontend/vercel.json` is already configured with the build command, output dir, SPA rewrites, and cache headers.
 
 ### Option C: Kubernetes
 
