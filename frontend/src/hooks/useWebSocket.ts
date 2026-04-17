@@ -1,5 +1,6 @@
 import { useEffect, useRef, useCallback } from "react";
 import { useTickerStore } from "../store/tickerStore";
+import { authClient } from "@/lib/authClient";
 import type { WsMessage } from "../types";
 
 const RECONNECT_DELAY_MS = 3000;
@@ -9,6 +10,7 @@ export function useWebSocket(symbols: string[]) {
     const symbolsRef = useRef(symbols);
     const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
     const seenAlertIdsRef = useRef<Set<string>>(new Set());
+    const sessionTokenRef = useRef<string | null>(null);
     const applyTick = useTickerStore((s) => s.applyTick);
     const applySnapshot = useTickerStore((s) => s.applySnapshot);
     const addAlert = useTickerStore((s) => s.addAlert);
@@ -17,12 +19,25 @@ export function useWebSocket(symbols: string[]) {
 
     symbolsRef.current = symbols;
 
+    // Fetch and cache the session token so it can be passed to the WS URL
+    // (the WS connects cross-origin to Railway; cookies aren't sent there).
+    useEffect(() => {
+        authClient.getSession()
+            .then((res) => {
+                sessionTokenRef.current = (res as { data?: { session?: { token?: string } } })?.data?.session?.token ?? null;
+            })
+            .catch(() => { /* unauthenticated */ });
+    }, []);
+
     const getWsUrl = useCallback(() => {
         const loc = window.location;
         const protocol = loc.protocol === "https:" ? "wss:" : "ws:";
         const wsBase = import.meta.env.VITE_WS_URL;
-        if (wsBase) return `${wsBase}/ws`;
-        return `${protocol}//${loc.host}/ws`;
+        let base = wsBase ? `${wsBase}/ws` : `${protocol}//${loc.host}/ws`;
+        if (sessionTokenRef.current) {
+            base += `?token=${encodeURIComponent(sessionTokenRef.current)}`;
+        }
+        return base;
     }, []);
 
     const subscribe = useCallback((ws: WebSocket) => {

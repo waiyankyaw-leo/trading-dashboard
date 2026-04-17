@@ -1,5 +1,5 @@
 import { WebSocketServer, WebSocket } from "ws";
-import type { Server } from "http";
+import type { Server, IncomingMessage } from "http";
 import { randomUUID } from "crypto";
 import { fromNodeHeaders } from "better-auth/node";
 import { simulator } from "../services/marketSimulator.js";
@@ -42,7 +42,7 @@ export function createWsServer(server: Server): WebSocketServer {
             removeConnectionAlerts(id);
         });
 
-        void hydrateClientAlerts(client, req.headers);
+        void hydrateClientAlerts(client, req);
     });
 
     // Broadcast ticks to subscribed clients
@@ -98,9 +98,20 @@ export function createWsServer(server: Server): WebSocketServer {
     return wss;
 }
 
-async function hydrateClientAlerts(client: TrackedClient, headers: Record<string, string | string[] | undefined>): Promise<void> {
+async function hydrateClientAlerts(client: TrackedClient, req: IncomingMessage): Promise<void> {
     try {
-        const session = await auth.api.getSession({ headers: fromNodeHeaders(headers) });
+        // In cross-origin deployments (e.g. Vercel + Railway) the session cookie
+        // is scoped to the frontend domain and is not sent with the WS handshake.
+        // The client passes the Better Auth session token as ?token= instead.
+        const urlToken = req.url
+            ? new URL(req.url, "http://localhost").searchParams.get("token")
+            : null;
+
+        const sessionHeaders = urlToken
+            ? new Headers({ authorization: `Bearer ${urlToken}` })
+            : fromNodeHeaders(req.headers);
+
+        const session = await auth.api.getSession({ headers: sessionHeaders });
         if (!session?.user.id) return;
 
         client.userId = session.user.id;
