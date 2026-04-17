@@ -1,6 +1,6 @@
 # TradeDash — Real-Time Trading Dashboard
 
-A full-stack trading dashboard that streams live simulated market data, renders interactive candlestick charts, and lets users set persistent price alerts — built as a submission for the Frontend/Fullstack Coding Challenge.
+A full-stack trading dashboard that streams live simulated market data, renders interactive candlestick charts, and lets users set persistent price alerts .
 
 **Live demo:** [https://trading-dashboard-xi-two.vercel.app](https://trading-dashboard-xi-two.vercel.app)
 
