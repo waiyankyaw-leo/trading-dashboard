@@ -55,7 +55,7 @@ TradeDash fulfils every scope requirement and all optional bonus features outlin
 |---|---|
 | **Backend** | Node.js 20, Fastify 5, TypeScript 5 |
 | **WebSocket** | `ws` library (raw, no Socket.io) |
-| **Auth** | Better Auth + Supabase (PostgreSQL) — HTTP-only session cookies |
+| **Auth** | Better Auth + PostgreSQL — HTTP-only session cookies |
 | **Cache** | node-cache (60 s TTL, `useClones: false`) |
 | **Frontend** | React 18, Vite 7, TypeScript 5 |
 | **Charts** | TradingView Lightweight Charts 5 |
@@ -97,13 +97,13 @@ Browser (Port 3000)                          Backend (Port 4000)
 ### Prerequisites
 
 - **Node.js 20+** and **npm 9+**
-- A **Supabase** project (free tier) or any PostgreSQL 14+ instance
+- A **PostgreSQL 14+** instance (Railway Postgres, Supabase free tier, or local)
 - Docker & Docker Compose v2 (optional, for containerized run)
 
 ### 1. Clone & install
 
 ```bash
-git clone https://github.com/<your-user>/trading-dashboard.git
+git clone https://github.com/waiyankyaw-leo/trading-dashboard.git
 cd trading-dashboard
 npm install          # installs all workspaces from root lockfile
 ```
@@ -238,7 +238,7 @@ Connect to `ws://localhost:4000/ws`
 
 ### 1. User Authentication
 
-Better Auth with Supabase (PostgreSQL). Sessions stored server-side with HTTP-only cookies — **no tokens in `localStorage`**, eliminating XSS attack vectors. CSRF protection via trusted origins. Supports login, registration, and session-based route protection.
+Better Auth with PostgreSQL (Railway Postgres). Sessions stored server-side with HTTP-only cookies — **no tokens in `localStorage`**, eliminating XSS attack vectors. CSRF protection via trusted origins. Supports login, registration, and session-based route protection.
 
 ### 2. History Caching
 
@@ -281,9 +281,11 @@ Complete `k8s/` directory:
 docker compose up --build
 ```
 
-### Option B: Vercel (Frontend) + Railway (Backend) + Supabase (Database)
+### Option B: Vercel (Frontend) + Railway (Backend) + Railway Postgres (Database)
 
 > This is a **monorepo** — push one repo to GitHub; Railway and Vercel each consume their own slice using the settings below.
+
+**Live demo:** [https://trading-dashboard-xi-two.vercel.app](https://trading-dashboard-xi-two.vercel.app)
 
 #### Step 0 — Push to GitHub
 
@@ -292,17 +294,15 @@ git remote add origin https://github.com/<your-user>/tradedash.git
 git push -u origin master
 ```
 
-#### Step 1 — Supabase (database)
-1. Create a Supabase project → copy the direct connection string (port 5432).
-2. Run both SQL files in the Supabase SQL Editor (in order):
-   - `backend/auth-schema.sql`
-   - `backend/migrations/001_create_price_alerts.sql`
+#### Step 1 — Database (Railway Postgres recommended)
+1. Add a Railway Postgres service to your project → Railway auto-sets `${{Postgres.DATABASE_URL}}`.
+2. Migrations run automatically on deploy via `migrate.js` — no manual SQL needed.
 
 #### Step 2 — Railway (backend)
 1. Go to [railway.app](https://railway.app) → **New Project → Deploy from GitHub repo**.
 2. Select the repo. Railway auto-detects `railway.json` — no manual build/start config needed.
 3. Add environment variables (**Variables** tab):
-   - `DATABASE_URL` — Supabase direct connection string (port 5432)
+   - `DATABASE_URL` — `${{Postgres.DATABASE_URL}}` (Railway Postgres reference)
    - `BETTER_AUTH_SECRET` — `openssl rand -hex 32`
    - `BETTER_AUTH_URL` — `https://<your-railway-domain>` (shown after first deploy)
    - `FRONTEND_URL` — `https://<your-vercel-domain>` (update after Step 3)
@@ -311,11 +311,11 @@ git push -u origin master
 
 #### Step 3 — Vercel (frontend)
 1. Import the repo at [vercel.com](https://vercel.com). Set **Root Directory = `frontend`**.
-2. Add environment variables:
-   - `VITE_API_URL` — `https://<your-railway-domain>`
+2. Add environment variable:
    - `VITE_WS_URL` — `wss://<your-railway-domain>`
+   > `VITE_API_URL` is **not needed** — `vercel.json` proxies `/api/*` to Railway so cookies are always first-party.
 3. Deploy, then go back to Railway and update `FRONTEND_URL` with the Vercel production URL.
-   > `frontend/vercel.json` is already configured with SPA rewrites and security headers.
+   > `frontend/vercel.json` is already configured with SPA rewrites, `/api` proxy, and security headers.
 
 ### Option C: Kubernetes
 
