@@ -6,6 +6,7 @@ import { simulator } from "../services/marketSimulator.js";
 import { isValidSymbol } from "../services/tickerService.js";
 import { addAlert, removeConnectionAlert, removeConnectionAlerts, checkAlerts, setConnectionAlerts } from "../services/alertService.js";
 import { auth } from "../lib/auth.js";
+import { dbPool } from "../lib/db.js";
 import { createAlert, deleteAlert, findActiveAlertById, listActiveAlertsByUser, markAlertTriggered } from "../services/alertRepository.js";
 import type { WsIncomingMessage, WsOutgoingMessage } from "../types/index.js";
 
@@ -112,12 +113,17 @@ async function hydrateClientAlerts(client: TrackedClient, headers: Record<string
 
 async function authenticateWithToken(client: TrackedClient, token: string): Promise<void> {
     try {
-        const session = await auth.api.getSession({
-            headers: new Headers({ authorization: `Bearer ${token}` }),
-        });
-        if (!session?.user.id) return;
+        // Look up the session directly in the DB by its token.
+        // Better Auth's getSession only reads from cookies / signed cookie headers,
+        // which are unavailable in cross-origin WS connections.
+        const result = await dbPool.query<{ userId: string; expiresAt: Date }>(
+            `SELECT "userId", "expiresAt" FROM "session" WHERE "token" = $1 LIMIT 1`,
+            [token],
+        );
+        const row = result.rows[0];
+        if (!row || new Date(row.expiresAt) < new Date()) return;
 
-        await armClientAlerts(client, session.user.id);
+        await armClientAlerts(client, row.userId);
     } catch {
         // Invalid token — ignore
     }
