@@ -42,7 +42,7 @@ TradeDash fulfils every scope requirement and all optional bonus features outlin
 | Clean code & separation of concerns | ✅ | Routes → Services → Repository pattern; Zustand + React Query split |
 | Unit tests for backend logic | ✅ | 49 backend tests (Vitest) — services, routes, WebSocket |
 | Docker containerization | ✅ | Workspace-aware multi-stage Dockerfiles |
-| **Bonus: User Authentication** | ✅ | Better Auth + Supabase PostgreSQL, HTTP-only session cookies |
+| **Bonus: User Authentication** | ✅ | Better Auth + PostgreSQL, HTTP-only session cookies |
 | **Bonus: History Caching** | ✅ | `node-cache` with 60 s TTL, composite cache keys |
 | **Bonus: Price Threshold Alerts** | ✅ | Persisted alerts with draggable chart lines, toast notifications |
 | **Bonus: Kubernetes Manifests** | ✅ | Namespace, Deployment, Service, HPA, ConfigMap, Secret, Ingress |
@@ -77,7 +77,7 @@ Browser (Port 3000)                          Backend (Port 4000)
 │  TailwindCSS             │  ── WS ──────► │  ws WebSocket server     │
 │  Lightweight Charts 5    │                │  Better Auth             │
 │  Zustand + React Query   │                │  GBM Market Simulator    │
-│  Better Auth Client      │                │  Supabase (PostgreSQL)   │
+│  Better Auth Client      │                │  PostgreSQL (Railway)    │
 └──────────────────────────┘                └──────────────────────────┘
 ```
 
@@ -97,7 +97,7 @@ Browser (Port 3000)                          Backend (Port 4000)
 ### Prerequisites
 
 - **Node.js 20+** and **npm 9+**
-- A **PostgreSQL 14+** instance (Railway Postgres, Supabase free tier, or local)
+- A **PostgreSQL 14+** instance (Railway Postgres recommended, or any local Postgres)
 - Docker & Docker Compose v2 (optional, for containerized run)
 
 ### 1. Clone & install
@@ -114,42 +114,58 @@ npm install          # installs all workspaces from root lockfile
 cp backend/.env.example backend/.env
 ```
 
-Edit `backend/.env`:
+Edit `backend/.env` (see [`backend/.env.example`](backend/.env.example) for all options):
 
 ```env
-DATABASE_URL=postgresql://postgres:YOUR_PASSWORD@db.YOUR_PROJECT.supabase.co:5432/postgres
+DATABASE_URL=postgresql://postgres:YOUR_PASSWORD@YOUR_HOST:5432/postgres
 BETTER_AUTH_SECRET=<generate with: openssl rand -hex 32>
+BETTER_AUTH_URL=http://localhost:4000
+FRONTEND_URL=http://localhost:3000
+PORT=4000
+NODE_ENV=development
+TICK_INTERVAL_MS=1000
 ```
 
-### 3. Run database migrations
+### 3. Configure the frontend
 
-Open the **Supabase SQL Editor** and run, in order:
+```bash
+cp frontend/.env.example frontend/.env
+```
 
-1. `backend/auth-schema.sql` — creates Better Auth tables (`user`, `session`, `account`, `verification`).
-2. `backend/migrations/001_create_price_alerts.sql` — creates the `price_alerts` table with partial indexes.
+Edit `frontend/.env` (see [`frontend/.env.example`](frontend/.env.example) for all options):
 
-Or run the Better Auth CLI:
+```env
+# Leave blank for local dev — Vite proxy handles /api and /ws automatically
+VITE_API_URL=http://localhost:4000
+VITE_WS_URL=ws://localhost:4000
+```
+
+> In **production** (Vercel), only `VITE_WS_URL` is needed. HTTP requests use relative URLs proxied by `vercel.json`.
+
+### 4. Run database migrations
+
+Migrations run automatically on startup via `migrate.js`. To run manually:
 
 ```bash
 cd backend
 npm run db:migrate
 ```
 
-### 4. Start the backend
+### 5. Start the backend
 
 ```bash
 cd backend
 npm run dev          # http://localhost:4000
 ```
 
-### 5. Start the frontend
+### 6. Start the frontend
 
 ```bash
 cd frontend
 npm run dev          # http://localhost:3000 (proxies to :4000)
 ```
 
-### 6. Docker (both services)
+### 7. Docker (both services)
 
 ```bash
 cp backend/.env.example backend/.env
@@ -336,7 +352,7 @@ trading_project/
 ├── backend/
 │   ├── src/
 │   │   ├── config/tickers.ts         # Ticker definitions & seed prices
-│   │   ├── lib/auth.ts               # Better Auth + Supabase config
+│   │   ├── lib/auth.ts               # Better Auth + PostgreSQL config
 │   │   ├── lib/db.ts                 # PostgreSQL pool
 │   │   ├── middleware/authMiddleware.ts
 │   │   ├── routes/                   # alertRoutes, authRoutes, historyRoutes, tickerRoutes
