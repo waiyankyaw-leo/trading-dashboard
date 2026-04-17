@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: backend-config
+  namespace: tradedash
+data:
+  NODE_ENV: "production"
+  PORT: "4000"
+  TICK_INTERVAL_MS: "1000"
+  FRONTEND_URL: "http://frontend-service.tradedash.svc.cluster.local"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: backend-secret
+  namespace: tradedash
+type: Opaque
+stringData:
+  DATABASE_URL: "postgresql://postgres:changeme@db.your-project.supabase.co:5432/postgres"

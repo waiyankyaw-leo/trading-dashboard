@@ -1,0 +1,58 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── Design tokens ─────────────────────────────────────────────────
+   All colours used across the app are defined here as CSS custom
+   properties. Tailwind theme extends reference these variables so
+   that the chart config, class names, and LightweightCharts options
+   all draw from a single source of truth.
+───────────────────────────────────────────────────────────────── */
+:root {
+    --color-bg-primary: #0f172a;
+    /* slate-950  — main app background */
+    --color-bg-surface: #1e293b;
+    /* slate-800  — cards, grid lines    */
+    --color-bg-elevated: #334155;
+    /* slate-700  — tooltips, dropdowns  */
+    --color-border: #1e293b;
+    --color-text-primary: #f1f5f9;
+    /* slate-100  */
+    --color-text-muted: #94a3b8;
+    /* slate-400  */
+    --color-gain: #22c55e;
+    /* green-500  */
+    --color-loss: #ef4444;
+    /* red-500    */
+    --color-alert: #facc15;
+    /* yellow-400 */
+    --color-price-line: #3b82f6;
+    /* blue-500   */
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+        "Helvetica Neue", Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+/* Custom scrollbar for dark theme */
+::-webkit-scrollbar {
+    width: 6px;
+}
+
+::-webkit-scrollbar-track {
+    background: #0f172a;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #334155;
+    border-radius: 3px;
+}
